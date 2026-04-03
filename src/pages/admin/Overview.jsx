@@ -95,12 +95,26 @@ export default function Overview() {
     return acc;
   }, {});
 
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+
   const uniqueTodayAttendance = Object.values(attendanceByUser);
   const presentToday = uniqueTodayAttendance.filter(a => a.checkIn).length;
   const checkedOutToday = uniqueTodayAttendance.filter(a => a.checkIn && a.checkOut).length;
   const onLeaveToday = Object.values(todaySchedule).filter(s => ['annual', 'sick', 'holiday'].includes(s.type)).length;
   const offToday = Object.values(todaySchedule).filter(s => s.type === 'off').length;
-  const absentToday = Math.max(0, totalEmployees - presentToday - onLeaveToday - offToday);
+
+  // Only count as absent if: scheduled to work, shift started >15 min ago, and no check-in yet
+  let absentToday = 0;
+  employees.forEach(emp => {
+    if (attendanceByUser[emp.id]?.checkIn) return; // already present
+    const sch = todaySchedule[emp.id];
+    if (['off', 'annual', 'sick', 'holiday'].includes(sch?.type)) return; // on leave/off
+    if (sch?.type === 'work' && sch.startTime) {
+      const [sh, sm] = sch.startTime.split(':').map(Number);
+      if (nowMins > sh * 60 + sm + 15) absentToday++;
+    }
+  });
 
   // Late arrivals (checked in more than 15 min after scheduled start)
   let lateCount = 0;
@@ -183,8 +197,8 @@ export default function Overview() {
             {employees.map(emp => {
               const att = attendanceByUser[emp.id];
               const sch = todaySchedule[emp.id];
-              let status = 'absent';
-              let statusLabel = 'Absent';
+              let status = 'no-schedule';
+              let statusLabel = '–';
               let timeInfo = '';
 
               if (sch?.type === 'off') { status = 'off'; statusLabel = 'Day Off'; }
@@ -197,6 +211,16 @@ export default function Overview() {
               } else if (att?.checkIn) {
                 status = 'present'; statusLabel = 'Present';
                 timeInfo = `In: ${formatTime(att.checkIn)}`;
+              } else if (sch?.type === 'work' && sch.startTime) {
+                // No check-in yet — absent only if more than 15 min past shift start
+                const [sh, sm] = sch.startTime.split(':').map(Number);
+                if (nowMins > sh * 60 + sm + 15) {
+                  status = 'absent'; statusLabel = 'Absent';
+                } else {
+                  status = 'upcoming'; statusLabel = 'Upcoming';
+                }
+              } else if (sch?.type === 'work') {
+                status = 'upcoming'; statusLabel = 'Upcoming';
               }
 
               const statusClasses = {
@@ -205,6 +229,8 @@ export default function Overview() {
                 absent: 'status-absent',
                 off: 'status-off',
                 leave: 'status-leave',
+                upcoming: 'bg-gray-500/10 text-gray-400 border border-gray-500/20',
+                'no-schedule': 'bg-gray-500/5 text-gray-600 border border-gray-500/10',
               };
 
               return (
