@@ -49,9 +49,24 @@ export default function Analytics() {
       const daySessions = empAtt.filter(a => a.date === day);
       const completedSessions = daySessions.filter(s => s.checkIn && s.checkOut);
       const sch = empSch[day];
+      const isOffDay = ['off', 'annual', 'sick', 'holiday'].includes(sch?.type);
 
-      if (sch?.type === 'off') return;
-      if (['annual', 'sick', 'holiday'].includes(sch?.type)) { leaveDays++; return; }
+      if (isOffDay) {
+        if (completedSessions.length > 0) {
+          // Worked on a day off/holiday — all hours count as OT
+          const dayWorked = completedSessions.reduce((sum, s) => {
+            const ci = s.checkIn?.toDate ? s.checkIn.toDate() : new Date(s.checkIn);
+            const co = s.checkOut?.toDate ? s.checkOut.toDate() : new Date(s.checkOut);
+            return sum + Math.round((co - ci) / 60000);
+          }, 0);
+          totalWorked += dayWorked;
+          presentDays++;
+          totalOT += dayWorked;
+        } else {
+          if (sch?.type !== 'off') leaveDays++;
+        }
+        return;
+      }
 
       if (completedSessions.length > 0) {
         const dayWorked = completedSessions.reduce((sum, s) => {
