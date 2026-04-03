@@ -250,10 +250,14 @@ export default function AttendanceLog() {
           return sum + Math.round((co - ci) / 60000);
         }, 0);
         let aggOTMins = null;
-        if (completedSessions.length > 0 && sch?.type === 'work' && sch.startTime && sch.endTime) {
-          const [sh, sm] = sch.startTime.split(':').map(Number);
-          const [eh, em] = sch.endTime.split(':').map(Number);
-          aggOTMins = totalWorkedMins - ((eh * 60 + em) - (sh * 60 + sm));
+        if (completedSessions.length > 0) {
+          if (sch?.type === 'work' && sch.startTime && sch.endTime) {
+            const [sh, sm] = sch.startTime.split(':').map(Number);
+            const [eh, em] = sch.endTime.split(':').map(Number);
+            aggOTMins = totalWorkedMins - ((eh * 60 + em) - (sh * 60 + sm));
+          } else if (['off', 'annual', 'sick', 'holiday'].includes(sch?.type)) {
+            aggOTMins = totalWorkedMins; // all hours are OT on a day off/holiday
+          }
         }
 
         sessions.forEach((att, idx) => {
@@ -268,6 +272,7 @@ export default function AttendanceLog() {
     const ci = att.checkIn?.toDate ? att.checkIn.toDate() : new Date(att.checkIn);
     const co = att.checkOut?.toDate ? att.checkOut.toDate() : new Date(att.checkOut);
     const workedMins = Math.round((co - ci) / 60000);
+    if (['off', 'annual', 'sick', 'holiday'].includes(sch?.type)) return { mins: workedMins, worked: workedMins };
     if (sch?.type !== 'work' || !sch.startTime || !sch.endTime) return { mins: null, worked: workedMins };
     const [sh, sm] = sch.startTime.split(':').map(Number);
     const [eh, em] = sch.endTime.split(':').map(Number);

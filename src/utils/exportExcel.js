@@ -71,6 +71,10 @@ export function exportMonthlyAttendance({ employees, attendanceByEmployee, sched
             const ot = workedMins - scheduledMins;
             otShort = minutesToHHMM(ot);
             totalOTMins += ot;
+          } else if (['off', 'annual', 'sick', 'holiday'].includes(sch?.type)) {
+            // All hours count as OT on a day off/holiday
+            otShort = '+' + minutesToHHMM(workedMins);
+            totalOTMins += workedMins;
           }
         } else if (checkIn && !checkOut) {
           inTime = checkIn.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -136,6 +140,8 @@ export function exportMonthlyAttendance({ employees, attendanceByEmployee, sched
             const [eh, em] = sch.endTime.split(':').map(Number);
             const scheduledMins = (eh * 60 + em) - (sh * 60 + sm);
             otShort = minutesToHHMM(workedMins - scheduledMins);
+          } else if (['off', 'annual', 'sick', 'holiday'].includes(sch?.type)) {
+            otShort = '+' + minutesToHHMM(workedMins);
           }
         }
       }

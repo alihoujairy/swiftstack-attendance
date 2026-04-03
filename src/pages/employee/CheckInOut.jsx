@@ -179,8 +179,11 @@ export default function CheckInOut() {
     ? activeElapsedMins
     : totalCompletedMins + (isCheckedIn ? activeElapsedMins : 0);
 
-  // OT only calculated for normal completed today-shifts
-  const otMins = isComplete && scheduledMins ? totalCompletedMins - scheduledMins : null;
+  // On off/leave days, all worked hours count as OT; on work days, OT = worked - scheduled
+  const isOffDay = ['off', 'annual', 'sick', 'holiday'].includes(todaySchedule?.type);
+  const otMins = isComplete
+    ? (isOffDay ? totalCompletedMins : (scheduledMins ? totalCompletedMins - scheduledMins : null))
+    : null;
 
   // Display times — first check-in is from the active/first session
   const displayFirstRecord = activeRecord || todayRecords.find(r => r.date === today);
@@ -263,6 +266,16 @@ export default function CheckInOut() {
         </div>
       )}
 
+      {/* Off-day attendance notice */}
+      {isOffDay && (isCheckedIn || isComplete || completedTodayRecords.length > 0) && (
+        <div className="card p-3 border border-amber-500/20 bg-amber-500/5 flex items-center gap-3">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" className="flex-shrink-0">
+            <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+          </svg>
+          <p className="text-amber-400 text-sm">All hours worked today count as overtime (day off / holiday).</p>
+        </div>
+      )}
+
       {/* Main check in/out card */}
       <div className={`card p-8 text-center amber-glow border ${
         isCheckedIn ? 'border-green-500/30' : isComplete ? 'border-blue-500/20' : 'border-surface-600'
@@ -322,7 +335,7 @@ export default function CheckInOut() {
             {!isCheckedIn && (
               <button
                 onClick={handleCheckIn}
-                disabled={actionLoading || todaySchedule?.type === 'off' || todaySchedule?.type === 'annual' || todaySchedule?.type === 'holiday'}
+                disabled={actionLoading}
                 className="btn-primary w-full py-4 text-base flex items-center justify-center gap-3"
               >
                 {actionLoading

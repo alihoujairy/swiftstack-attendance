@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { getDaysInMonth, minutesToHHMM, monthLabel } from '../../utils/calculations';
+import { getDaysInMonth, minutesToHHMM, monthLabel, todayKey } from '../../utils/calculations';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const COLORS = ['#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EF4444'];
@@ -39,6 +39,7 @@ export default function Analytics() {
   };
 
   // Per-employee stats — aggregate multiple sessions per day
+  const today = todayKey();
   const empStats = employees.map(emp => {
     const empAtt = attendance.filter(a => a.userId === emp.id);
     const empSch = schedules[emp.id] || {};
@@ -49,9 +50,24 @@ export default function Analytics() {
       const daySessions = empAtt.filter(a => a.date === day);
       const completedSessions = daySessions.filter(s => s.checkIn && s.checkOut);
       const sch = empSch[day];
+      const isOffDay = ['off', 'annual', 'sick', 'holiday'].includes(sch?.type);
 
-      if (sch?.type === 'off') return;
-      if (['annual', 'sick', 'holiday'].includes(sch?.type)) { leaveDays++; return; }
+      if (isOffDay) {
+        if (completedSessions.length > 0) {
+          // Worked on a day off/holiday — all hours count as OT
+          const dayWorked = completedSessions.reduce((sum, s) => {
+            const ci = s.checkIn?.toDate ? s.checkIn.toDate() : new Date(s.checkIn);
+            const co = s.checkOut?.toDate ? s.checkOut.toDate() : new Date(s.checkOut);
+            return sum + Math.round((co - ci) / 60000);
+          }, 0);
+          totalWorked += dayWorked;
+          presentDays++;
+          totalOT += dayWorked;
+        } else {
+          if (sch?.type !== 'off') leaveDays++;
+        }
+        return;
+      }
 
       if (completedSessions.length > 0) {
         const dayWorked = completedSessions.reduce((sum, s) => {
@@ -67,7 +83,17 @@ export default function Analytics() {
           totalOT += dayWorked - ((eh * 60 + em) - (sh * 60 + sm));
         }
       } else if (sch?.type === 'work') {
-        absentDays++;
+        // Future days are unknown — never count as absent
+        if (day < today) {
+          absentDays++;
+        } else if (day === today && sch.startTime) {
+          // For today: only absent if more than 15 min past shift start with no check-in
+          const now = new Date();
+          const [sh, sm] = sch.startTime.split(':').map(Number);
+          const nowMins = now.getHours() * 60 + now.getMinutes();
+          if (nowMins > sh * 60 + sm + 15) absentDays++;
+        }
+        // day > today: skip — not yet known
       }
     });
 
