@@ -56,6 +56,9 @@ export default function MyAttendance() {
   // Compute stats — aggregate all completed sessions per day
   let totalWorked = 0, totalOT = 0, presentDays = 0, leaveDays = 0, offDays = 0;
   days.forEach(day => {
+    // Skip future days entirely — we don't know yet what will happen
+    if (day > today) return;
+
     const sessions = attendance[day] || [];
     const sch = schedules[day];
     const completedSessions = sessions.filter(s => s.checkIn && s.checkOut);
