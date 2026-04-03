@@ -1,1 +1,23 @@
+# Dependencies
 node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Environment / Sensitive Configs
+.env
+.env.local
+*.config.js  # Only use this if you want to ignore ALL config files (Tailwind, Vite, etc.)
+# If you only want to ignore a specific one, use the exact name:
+# config.js
+
+# OS files
+.DS_Store
+Thumbs.db
